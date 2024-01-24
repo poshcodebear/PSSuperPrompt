@@ -1,3 +1,5 @@
+$Global:__poshGitInstalled = [bool](Get-Module -Name posh-git -ListAvailable -Verbose:$false)
+
 function Global:prompt
 {
     $wd = (Get-Location).Path
@@ -16,8 +18,8 @@ function Global:prompt
         $admin = [bool](([System.Security.Principal.WindowsIdentity]::GetCurrent()).groups -match "S-1-5-32-544")
     }
     
-    $gitStatus = (Get-Module -Name oh-my-posh -ListAvailable) -and (Get-VCSStatus)
-
+    $gitStatus = $Global:__poshGitInstalled -and (Get-GitStatus)
+    
     if ($wd -eq $HOME)
     {
         $wd = '~'
@@ -89,9 +91,10 @@ function Global:prompt
     if ($gitStatus)
     {
         Write-Host "`b" -NoNewline
-        Write-VcsStatus
-        Write-Host ''
+        Write-Host (Write-VcsStatus) -NoNewline
     }
+    #>
+    Write-Host ''
     Write-Host "$($sym)" -ForegroundColor Cyan -NoNewLine
     return ' '
 }
