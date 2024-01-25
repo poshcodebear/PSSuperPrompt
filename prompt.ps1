@@ -42,7 +42,14 @@ function Global:prompt
     # History count:
     Write-Host "$((Get-History).Count + 1) " -NoNewline
     # PS Version:
-    Write-Host "($ver) " -ForegroundColor Magenta -NoNewline
+    if ($PSVersionTable.PSVersion.PreReleaseLabel)
+    {
+        Write-Host "($($ver)-$($PSVersionTable.PSVersion.PreReleaseLabel)) " -ForegroundColor Red -NoNewline
+    }
+    else
+    {
+        Write-Host "($ver) " -ForegroundColor Magenta -NoNewline
+    }
     # Timestamp:
     Write-Host "[$(([string](Get-Date)).Split()[1])] " -ForegroundColor Yellow -NoNewline
     
