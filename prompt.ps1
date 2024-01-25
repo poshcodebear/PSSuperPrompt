@@ -1,3 +1,5 @@
+$Global:__poshGitInstalled = [bool](Get-Module -Name posh-git -ListAvailable -Verbose:$false)
+
 function Global:prompt
 {
     $wd = (Get-Location).Path
@@ -5,7 +7,15 @@ function Global:prompt
     $hostname = hostname
     $ver = ([string]$PSVersionTable.PSVersion).Split('.')[0..1] -join '.'
     $jobs = Get-Job
-
+    
+    if ($ver -ge 7)
+        {$lastTime = Get-LastHistoryDuration}
+    # Extra versiony goodness:
+    if ($null -ne $PSVersionTable.PSVersion.Patch)
+    {
+        $ver += ".$($PSVersionTable.PSVersion.Patch)"
+    }
+    
     $admin = $false
     if ($IsLinux -and $user -eq 'root')
     {
@@ -16,8 +26,8 @@ function Global:prompt
         $admin = [bool](([System.Security.Principal.WindowsIdentity]::GetCurrent()).groups -match "S-1-5-32-544")
     }
     
-    $gitStatus = (Get-Module -Name oh-my-posh -ListAvailable) -and (Get-VCSStatus)
-
+    $gitStatus = $Global:__poshGitInstalled -and (Get-GitStatus)
+    
     if ($wd -eq $HOME)
     {
         $wd = '~'
@@ -26,13 +36,30 @@ function Global:prompt
     {
         $wd = $wd.Split('\')[-1]
     }
+    elseif ($gitStatus -and $wd -like '*::*')
+    {
+        $wd = $wd.Split(':')[-1]
+    }
     
     # History count:
-    Write-Host "$((Get-History).Count + 1) " -NoNewline
+    Write-Host "$(((Get-History).Count + 1).ToString().PadLeft(3, '0')) " -NoNewline
     # PS Version:
-    Write-Host "($ver) " -ForegroundColor Magenta -NoNewline
+    if ($PSVersionTable.PSVersion.PreReleaseLabel)
+    {
+        Write-Host "($($ver)-$($PSVersionTable.PSVersion.PreReleaseLabel)) " -ForegroundColor Red -NoNewline
+    }
+    else
+    {
+        Write-Host "($ver) " -ForegroundColor Magenta -NoNewline
+    }
     # Timestamp:
     Write-Host "[$(([string](Get-Date)).Split()[1])] " -ForegroundColor Yellow -NoNewline
+    
+    # Last Execution Time:
+    if ($ver -ge 7 -and $lastTime)
+    {
+        Write-Host "<$($lastTime)> " -ForegroundColor Blue -NoNewline
+    }
     
     # Job control:
     if ($jobs)
@@ -89,12 +116,39 @@ function Global:prompt
     if ($gitStatus)
     {
         Write-Host "`b" -NoNewline
-        Write-VcsStatus
-        Write-Host ''
+        Write-Host (Write-VcsStatus) -NoNewline
     }
+    #>
+    Write-Host ''
     Write-Host "$($sym)" -ForegroundColor Cyan -NoNewLine
     return ' '
 }
 
-Invoke-Expression "function Reset-Prompt { . $($MyInvocation.MyCommand.Path) }"
+function Get-LastHistoryDuration
+{
+    if ((Get-History).Count -gt 0)
+    {
+        $duration = (Get-History)[-1].Duration
+        # Use the int portion of TotalHours because we're not doing Days
+        $hours = ([decimal]$duration.TotalHours).ToString().Split('.')[0]
+        $hours = $hours.PadLeft(2, '0')
+        
+        $minutes = $duration.Minutes.ToString().PadLeft(2, '0')
+        $seconds = $duration.Seconds.ToString().PadLeft(2, '0')
+        $milliseconds = $duration.Milliseconds.ToString().PadLeft(3, '0')
+        $output = "$($seconds).$($milliseconds)"
+        if ($minutes -ne '00')
+        {
+            $output = "$($minutes):$($output)"
+        }
+        if ($hours -ne '00')
+        {
+            $output = "$($hours):$($output)"
+        }
+        
+        return $output
+    }
+}
+
+Invoke-Expression "function Reset-Prompt { . '$($MyInvocation.MyCommand.Path)' }"
 New-Alias -Name 'rsp' -Value 'Reset-Prompt' -Force
