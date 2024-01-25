@@ -40,7 +40,7 @@ function Global:prompt
     }
     
     # History count:
-    Write-Host "$((Get-History).Count + 1) " -NoNewline
+    Write-Host "$(((Get-History).Count + 1).ToString().PadLeft(3, '0')) " -NoNewline
     # PS Version:
     if ($PSVersionTable.PSVersion.PreReleaseLabel)
     {
