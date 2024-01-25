@@ -34,6 +34,10 @@ function Global:prompt
     {
         $wd = $wd.Split('\')[-1]
     }
+    elseif ($gitStatus -and $wd -like '*::*')
+    {
+        $wd = $wd.Split(':')[-1]
+    }
     
     # History count:
     Write-Host "$((Get-History).Count + 1) " -NoNewline
