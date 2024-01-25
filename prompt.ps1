@@ -8,6 +8,12 @@ function Global:prompt
     $ver = ([string]$PSVersionTable.PSVersion).Split('.')[0..1] -join '.'
     $jobs = Get-Job
 
+    # Extra versiony goodness:
+    if ($null -ne $PSVersionTable.PSVersion.Patch)
+    {
+        $ver += ".$($PSVersionTable.PSVersion.Patch)"
+    }
+    
     $admin = $false
     if ($IsLinux -and $user -eq 'root')
     {
