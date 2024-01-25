@@ -7,7 +7,9 @@ function Global:prompt
     $hostname = hostname
     $ver = ([string]$PSVersionTable.PSVersion).Split('.')[0..1] -join '.'
     $jobs = Get-Job
-
+    
+    if ($ver -ge 7)
+        {$lastTime = Get-LastHistoryDuration}
     # Extra versiony goodness:
     if ($null -ne $PSVersionTable.PSVersion.Patch)
     {
@@ -52,6 +54,12 @@ function Global:prompt
     }
     # Timestamp:
     Write-Host "[$(([string](Get-Date)).Split()[1])] " -ForegroundColor Yellow -NoNewline
+    
+    # Last Execution Time:
+    if ($ver -ge 7 -and $lastTime)
+    {
+        Write-Host "<$($lastTime)> " -ForegroundColor Blue -NoNewline
+    }
     
     # Job control:
     if ($jobs)
@@ -116,5 +124,31 @@ function Global:prompt
     return ' '
 }
 
-Invoke-Expression "function Reset-Prompt { . $($MyInvocation.MyCommand.Path) }"
+function Get-LastHistoryDuration
+{
+    if ((Get-History).Count -gt 0)
+    {
+        $duration = (Get-History)[-1].Duration
+        # Use the int portion of TotalHours because we're not doing Days
+        $hours = ([decimal]$duration.TotalHours).ToString().Split('.')[0]
+        $hours = $hours.PadLeft(2, '0')
+        
+        $minutes = $duration.Minutes.ToString().PadLeft(2, '0')
+        $seconds = $duration.Seconds.ToString().PadLeft(2, '0')
+        $milliseconds = $duration.Milliseconds.ToString().PadLeft(3, '0')
+        $output = "$($seconds).$($milliseconds)"
+        if ($minutes -ne '00')
+        {
+            $output = "$($minutes):$($output)"
+        }
+        if ($hours -ne '00')
+        {
+            $output = "$($hours):$($output)"
+        }
+        
+        return $output
+    }
+}
+
+Invoke-Expression "function Reset-Prompt { . '$($MyInvocation.MyCommand.Path)' }"
 New-Alias -Name 'rsp' -Value 'Reset-Prompt' -Force
