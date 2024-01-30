@@ -11,6 +11,33 @@
     - Force (no prompting, just do it)
 #>
 
+function Get-ValidResponse
+{
+    param
+    (
+        [string]$Message,
+        [hashtable]$ValidResponsesTable
+    )
+    
+    while ($true)
+    {
+        Write-Host $Message -NoNewline
+        Write-Host " (Select: <$($ValidResponsesTable.Keys -join '/')>)"
+        
+        $response = Read-Host
+        
+        if ($response -in $ValidResponsesTable.Keys)
+        {
+            return $ValidResponsesTable[$response]
+        }
+        Write-Warning "'$($response)' in an invalid response, please try again"
+    }
+}
+$validResponses = [ordered]@{
+    'y' = $true
+    'n' = $false
+}
+
 $profilePath = Split-Path -Path $profile
 
 if (! (Test-Path -Path $profilePath))
@@ -28,28 +55,7 @@ $promptFileExists = Test-Path -Path "$($profilePath)\prompt.ps1"
 $forceCopy = $false
 if ($promptFileExists)
 {
-    Write-Host 'Profile already exists, ' -NoNewline
-    $validResponse = $false
-    do
-    {
-        Write-Host 'overwrite? (y/n)'
-        switch (Read-Host)
-        {
-            'y'
-            {
-                $forceCopy = $true
-                $validResponse = $true
-                break
-            }
-            'n'
-            {
-                $validResponse = $true
-                break
-            }
-            default { Write-Warning -Message "'$($_)' is an invalid response" }
-        }
-    }
-    until ($validResponse)
+    $forceCopy = Get-ValidResponse -Message 'Prompt script already exists, overwrite?' -ValidResponsesTable $validResponses
 }
 if ($forceCopy -or -not $promptFileExists)
 {
