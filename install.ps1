@@ -3,7 +3,7 @@
     - Create profile and profile path if necessary
 - Copy prompt.ps1 to profile path (done)
     - Note: should check to see if it already exists and to prompt to overwrite
-- Add a line at the end of the profile to dot-source the prompt
+- Add a line at the end of the profile to dot-source the prompt (done)
     - Note: should check to see if the invocation already exists first and warn if no changes were made
 - Add error handling
 - Add parameters
@@ -60,4 +60,32 @@ if ($promptFileExists)
 if ($forceCopy -or -not $promptFileExists)
 {
     Copy-Item -Path $promptFile -Destination $profilePath
+}
+
+$promptLine = "`n# PSSuperPrompt`n. '$($promptFile)'"
+$promptRegEx = '# PSSuperPrompt\n\. ''(?<PromptFile>[^'']+)'''
+$profileContent = Get-Content -Path $profile -Raw
+if ($profileContent -match $promptRegEx)
+{
+    
+    if ($matches.PromptFile -eq $promptFile)
+    {
+        Write-Warning -Message 'Prompt already installed in profile, no changes needed'
+    }
+    else
+    {
+        Write-Warning -Message "Prompt already installed in profile with a different path"
+        Write-Warning -Message "Existing: $($matches.PromptFile)"
+        Write-Warning -Message "New:      $($promptFile)"
+        
+        $updatePrompt = Get-ValidResponse -Message 'Update?' -ValidResponsesTable $validResponses
+        if ($updatePrompt)
+        {
+            $profileContent -replace $promptRegEx, $promptLine.TrimStart() | Out-File -FilePath $profile -NoNewline
+        }
+    }
+}
+else
+{
+    $promptLine | Out-File -FilePath $profile -Append
 }
