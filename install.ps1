@@ -1,16 +1,3 @@
-<# Workflow:
-- Verify profile exists (done)
-    - Create profile and profile path if necessary
-- Copy prompt.ps1 to profile path (done)
-    - Note: should check to see if it already exists and to prompt to overwrite
-- Add a line at the end of the profile to dot-source the prompt (done)
-    - Note: should check to see if the invocation already exists first and warn if no changes were made
-- Add error handling
-- Add parameters
-    - Quiet (no feedback other than prompting)
-    - Force (no prompting, just do it)
-#>
-
 function Get-ValidResponse
 {
     param
@@ -40,14 +27,19 @@ $validResponses = [ordered]@{
 
 $profilePath = Split-Path -Path $profile
 
-if (! (Test-Path -Path $profilePath))
+try
 {
-    New-Item -ItemType Directory -Path $profilePath
+    if (! (Test-Path -Path $profilePath))
+    {
+        New-Item -ItemType Directory -Path $profilePath -ErrorAction Stop
+    }
+    if (! (Test-Path -Path $profile))
+    {
+        New-Item -ItemType File -Path $profile -ErrorAction Stop
+        Write-Warning -Message "New profile created at: '$($profile)'"
+    }
 }
-if (! (Test-Path -Path $profile))
-{
-    New-Item -ItemType File -Path $profile
-}
+catch {throw "No profile found and unable to create one; exception: $($_.Exception.Message)"}
 
 $promptFile = "$($PSScriptRoot)\prompt.ps1"
 $promptFileExists = Test-Path -Path "$($profilePath)\prompt.ps1"
@@ -59,33 +51,45 @@ if ($promptFileExists)
 }
 if ($forceCopy -or -not $promptFileExists)
 {
-    Copy-Item -Path $promptFile -Destination $profilePath
+    try   {Copy-Item -Path $promptFile -Destination $profilePath -ErrorAction Stop}
+    catch {throw "Unable to copy prompt script to '$($profilePath)'; exception: $($_.Exception.Message)"}
 }
 
 $promptLine = "`n# PSSuperPrompt`n. '$($promptFile)'"
 $promptRegEx = '# PSSuperPrompt\n\. ''(?<PromptFile>[^'']+)'''
-$profileContent = Get-Content -Path $profile -Raw
-if ($profileContent -match $promptRegEx)
+try   {$profileContent = Get-Content -Path $profile -Raw}
+catch {throw "Unable to read from profile; exception: $($_.Exception.Message)"}
+try
 {
-    
-    if ($matches.PromptFile -eq $promptFile)
+    if ($profileContent -match $promptRegEx)
     {
-        Write-Warning -Message 'Prompt already installed in profile, no changes needed'
+        
+        if ($matches.PromptFile -eq $promptFile)
+        {
+            Write-Warning -Message 'Prompt already installed in profile, no changes needed'
+        }
+        else
+        {
+            Write-Warning -Message "Prompt already installed in profile with a different path"
+            Write-Warning -Message "Existing: $($matches.PromptFile)"
+            Write-Warning -Message "New:      $($promptFile)"
+            
+            $updatePrompt = Get-ValidResponse -Message 'Update?' -ValidResponsesTable $validResponses
+            if ($updatePrompt)
+            {
+                $outFileSplat = @{
+                    FilePath    = $profile
+                    NoNewline   = $true
+                    ErrorAction = 'Stop'
+                }
+
+                $profileContent -replace $promptRegEx, $promptLine.TrimStart() | Out-File @outFileSplat
+            }
+        }
     }
     else
     {
-        Write-Warning -Message "Prompt already installed in profile with a different path"
-        Write-Warning -Message "Existing: $($matches.PromptFile)"
-        Write-Warning -Message "New:      $($promptFile)"
-        
-        $updatePrompt = Get-ValidResponse -Message 'Update?' -ValidResponsesTable $validResponses
-        if ($updatePrompt)
-        {
-            $profileContent -replace $promptRegEx, $promptLine.TrimStart() | Out-File -FilePath $profile -NoNewline
-        }
+        $promptLine | Out-File -FilePath $profile -Append -ErrorAction Stop
     }
 }
-else
-{
-    $promptLine | Out-File -FilePath $profile -Append
-}
+catch {throw "Unable to add prompt to profile; exception: $($_.Exception.Message)"}
